@@ -753,6 +753,26 @@ On success it will return the configured domains.
       }
     }
 
+### IPAReplicaCountCheck
+
+Report the number of IPA replicas (servers) in the deployment. IPA supports
+a maximum of 60 replicas; exceeding this is not supported. A CRITICAL result
+is returned when the count is exceeded. The number of CA replicas is
+reported separately because only CA replicas replicate certificate data.
+
+    {
+      "source": "ipahealthcheck.ipa.topology",
+      "check": "IPAReplicaCountCheck",
+      "result": "CRITICAL",
+      "kw": {
+        "key": "ipa_replicas",
+        "label": "IPA replicas",
+        "count": 61,
+        "max": 60,
+        "msg": "The number of IPA replicas is 61 which exceeds the supported maximum of 60."
+      }
+    }
+
 ## ipahealthcheck.ipa.trust
 
 Verify common AD Trust configuration issues. Checks will return SUCCESS if not configured as a trust agent or controller.

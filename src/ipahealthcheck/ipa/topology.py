@@ -77,3 +77,66 @@ class IPATopologyDomainCheck(IPAPlugin):
         if api.Command.ca_is_enabled()['result']:
             for y in self.run_check(u'ca'):
                 yield y
+
+
+@registry
+class IPAReplicaCountCheck(IPAPlugin):
+    """
+    Report the number of IPA replicas (servers) in the deployment.
+
+    IPA supports a maximum of 60 replicas. Report a CRITICAL error when the
+    number of servers exceeds this limit. The number of CA replicas is
+    reported separately because only CA replicas replicate certificate data.
+    """
+    requires = ('dirsrv',)
+
+    MAX_REPLICAS = 60
+
+    def count_check(self, key, label, count):
+        if count > self.MAX_REPLICAS:
+            yield Result(self, constants.CRITICAL,
+                         key=key,
+                         label=label,
+                         count=count,
+                         max=self.MAX_REPLICAS,
+                         msg='The number of {label} is {count} which exceeds '
+                             'the supported maximum of {max}.')
+        else:
+            yield Result(self, constants.SUCCESS,
+                         key=key,
+                         label=label,
+                         count=count)
+
+    @duration
+    def check(self):
+        # Total number of IPA servers (replicas)
+        try:
+            result = api.Command.server_find(sizelimit=0)
+        except Exception as e:
+            yield Result(self, constants.ERROR,
+                         key='ipa_replicas',
+                         error=str(e),
+                         msg='Unable to retrieve the list of IPA servers: '
+                             '{error}')
+        else:
+            count = result.get('count', len(result.get('result', [])))
+            for y in self.count_check('ipa_replicas', 'IPA replicas', count):
+                yield y
+
+        # CA replicas; only servers with the CA role replicate certificate
+        # data so they are counted separately.
+        if not api.Command.ca_is_enabled()['result']:
+            return
+        try:
+            result = api.Command.server_role_find(
+                role_servrole=u'CA server', status=u'enabled', sizelimit=0)
+        except Exception as e:
+            yield Result(self, constants.ERROR,
+                         key='ca_replicas',
+                         error=str(e),
+                         msg='Unable to retrieve the list of CA servers: '
+                             '{error}')
+        else:
+            count = result.get('count', len(result.get('result', [])))
+            for y in self.count_check('ca_replicas', 'CA replicas', count):
+                yield y
